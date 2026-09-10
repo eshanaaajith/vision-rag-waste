@@ -10,7 +10,8 @@ METADATA_FILE = Path("rag/vector_store/metadata.json")
 
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
-TOP_K = 3
+CANDIDATE_K = 30
+TOP_K = CANDIDATE_K
 
 
 def load_resources():
@@ -43,7 +44,7 @@ def retrieve(question, model, index, metadata):
 
     scores, indices = index.search(
         query_embedding,
-        TOP_K
+        CANDIDATE_K
     )
 
     results = []
