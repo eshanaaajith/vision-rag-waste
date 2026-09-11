@@ -11,6 +11,8 @@ DATASET_DIR = Path(
 )
 
 OUTPUT_DIR = Path("data/processed")
+RESULTS_DIR = Path("results")
+SPLIT_SUMMARY_CSV = RESULTS_DIR / "dataset_splits.csv"
 
 IMAGE_EXTENSIONS = {
     ".jpg",
@@ -98,6 +100,46 @@ def print_distribution(name, df):
     print(f"{'Total':10s}: {len(df)}")
 
 
+def save_split_summary(train_df, val_df, test_df):
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    class_names = sorted(
+        set(train_df["class"])
+        | set(val_df["class"])
+        | set(test_df["class"])
+    )
+
+    rows = []
+
+    for split_name, split_df in [
+        ("train", train_df),
+        ("validation", val_df),
+        ("test", test_df),
+    ]:
+        counts = split_df["class"].value_counts()
+        row = {"split": split_name, "images": len(split_df)}
+        for class_name in class_names:
+            row[class_name] = int(counts.get(class_name, 0))
+        rows.append(row)
+
+    total_df = pd.concat(
+        [train_df, val_df, test_df],
+        ignore_index=True
+    )
+    total_counts = total_df["class"].value_counts()
+    total_row = {"split": "total", "images": len(total_df)}
+    for class_name in class_names:
+        total_row[class_name] = int(total_counts.get(class_name, 0))
+    rows.append(total_row)
+
+    pd.DataFrame(rows).to_csv(
+        SPLIT_SUMMARY_CSV,
+        index=False
+    )
+
+    print(f"\nSaved split summary to: {SPLIT_SUMMARY_CSV}")
+
+
 def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -141,6 +183,8 @@ def main():
     print(f"Validation : {len(val_df)}")
     print(f"Test       : {len(test_df)}")
     print(f"Total      : {len(train_df) + len(val_df) + len(test_df)}")
+
+    save_split_summary(train_df, val_df, test_df)
 
     # Verify no overlap
     train_paths = set(train_df["image_path"])

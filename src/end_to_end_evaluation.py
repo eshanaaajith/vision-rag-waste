@@ -8,7 +8,12 @@ sys.path.insert(0, str(SRC_DIR))
 
 from classify_image import classify_image, load_classifier
 from retrieve import load_resources
-from rag_answer import generate_answer, gather_evidence, format_retrieved_sources
+from rag_answer import (
+    generate_answer,
+    gather_evidence,
+    format_retrieved_sources,
+    INSUFFICIENT_EVIDENCE,
+)
 
 
 # --------------------------------------------------
@@ -27,6 +32,18 @@ QUESTIONS = {
     "Paper": "How should paper waste be handled?",
     "Plastic": "How should plastic waste be recycled?",
 }
+
+
+def answer_support_status(answer):
+    text = (answer or "").strip()
+
+    if not text or text == INSUFFICIENT_EVIDENCE:
+        return "Unsupported"
+
+    if text.startswith(INSUFFICIENT_EVIDENCE):
+        return "Unsupported"
+
+    return "Supported"
 
 
 # --------------------------------------------------
@@ -168,12 +185,18 @@ User question:
 
         print(f"Answer     : {answer}")
 
+        status = answer_support_status(answer)
+        image_id = Path(image_path).name
+
+        print(f"Support    : {status}")
+
         # --------------------------------------------------
         # Save result
         # --------------------------------------------------
 
         results.append({
             "case_id": i + 1,
+            "image_id": image_id,
             "image_path": image_path,
             "true_class": true_class,
             "predicted_class": predicted_class,
@@ -183,7 +206,8 @@ User question:
             "retrieved_sources": " | ".join(
                 displayed_sources
             ),
-            "answer": answer
+            "answer": answer,
+            "support_status": status,
         })
 
     # --------------------------------------------------
@@ -223,6 +247,15 @@ User question:
     print(
         f"Classification accuracy : "
         f"{accuracy:.2%}"
+    )
+
+    supported = (
+        output_df["support_status"] == "Supported"
+    ).sum()
+
+    print(
+        f"Supported answers : "
+        f"{supported}/{len(output_df)}"
     )
 
     print(

@@ -9,6 +9,7 @@ from sklearn.metrics import (
     confusion_matrix,
     ConfusionMatrixDisplay,
     f1_score,
+    precision_recall_fscore_support,
 )
 
 from model import WasteCNN
@@ -25,6 +26,15 @@ TEST_CSV = "data/processed/test.csv"
 RESULTS_DIR = "results"
 PREDICTIONS_CSV = os.path.join(
     RESULTS_DIR, "test_predictions.csv"
+)
+METRICS_CSV = os.path.join(
+    RESULTS_DIR, "classification_metrics.csv"
+)
+REPORT_TXT = os.path.join(
+    RESULTS_DIR, "classification_report.txt"
+)
+CONFUSION_MATRIX_CSV = os.path.join(
+    RESULTS_DIR, "confusion_matrix.csv"
 )
 CONFUSION_MATRIX_PNG = os.path.join(
     RESULTS_DIR, "confusion_matrix.png"
@@ -169,15 +179,102 @@ report = classification_report(
 
 print(report)
 
+cm = confusion_matrix(
+    all_true,
+    all_pred,
+    labels=list(range(len(CLASS_NAMES)))
+)
+
+
+# -----------------------------
+# Save metrics
+# -----------------------------
+precision, recall, f1, support = precision_recall_fscore_support(
+    all_true,
+    all_pred,
+    labels=list(range(len(CLASS_NAMES))),
+    zero_division=0,
+)
+
+metrics_rows = []
+
+for i, class_name in enumerate(CLASS_NAMES):
+    metrics_rows.append({
+        "class": class_name,
+        "precision": round(float(precision[i]), 4),
+        "recall": round(float(recall[i]), 4),
+        "f1": round(float(f1[i]), 4),
+        "support": int(support[i]),
+    })
+
+macro_precision = float(precision.mean())
+macro_recall = float(recall.mean())
+
+metrics_rows.append({
+    "class": "macro_avg",
+    "precision": round(macro_precision, 4),
+    "recall": round(macro_recall, 4),
+    "f1": round(float(macro_f1), 4),
+    "support": int(sum(support)),
+})
+
+metrics_rows.append({
+    "class": "accuracy",
+    "precision": round(float(accuracy), 4),
+    "recall": round(float(accuracy), 4),
+    "f1": round(float(accuracy), 4),
+    "support": int(sum(support)),
+})
+
+pd.DataFrame(metrics_rows).to_csv(
+    METRICS_CSV,
+    index=False
+)
+
+with open(REPORT_TXT, "w", encoding="utf-8") as report_file:
+    report_file.write("TEST SET RESULTS\n")
+    report_file.write(
+        f"Test Accuracy : {accuracy:.4f} "
+        f"({accuracy * 100:.2f}%)\n"
+    )
+    report_file.write(f"Macro F1      : {macro_f1:.4f}\n\n")
+    report_file.write("Per-class classification report:\n\n")
+    report_file.write(report)
+
+cm_df = pd.DataFrame(
+    cm,
+    index=CLASS_NAMES,
+    columns=CLASS_NAMES
+)
+cm_df.to_csv(CONFUSION_MATRIX_CSV)
+
+print(f"Saved metrics to: {METRICS_CSV}")
+print(f"Saved report to: {REPORT_TXT}")
+print(f"Saved confusion matrix CSV to: {CONFUSION_MATRIX_CSV}")
+
 
 # -----------------------------
 # Save predictions
 # -----------------------------
 predictions_df = test_df.copy()
 
+predictions_df["image_id"] = predictions_df["image_path"].map(
+    lambda path: os.path.basename(str(path))
+)
 predictions_df["true_class"] = true_names
 predictions_df["predicted_class"] = pred_names
 predictions_df["confidence"] = all_confidence
+
+predictions_df = predictions_df[
+    [
+        "image_id",
+        "image_path",
+        "class",
+        "true_class",
+        "predicted_class",
+        "confidence",
+    ]
+]
 
 predictions_df.to_csv(
     PREDICTIONS_CSV,
@@ -190,14 +287,8 @@ print(
 
 
 # -----------------------------
-# Confusion matrix
+# Confusion matrix plot
 # -----------------------------
-cm = confusion_matrix(
-    all_true,
-    all_pred,
-    labels=list(range(len(CLASS_NAMES)))
-)
-
 fig, ax = plt.subplots(
     figsize=(8, 8)
 )
