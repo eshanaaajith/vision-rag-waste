@@ -1,0 +1,13 @@
+torch
+torchvision
+pandas
+scikit-learn
+matplotlib
+pillow
+pillow-heif
+numpy
+faiss-cpu
+sentence-transformers
+pypdf
+beautifulsoup4
+transformers
